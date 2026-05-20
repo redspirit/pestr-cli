@@ -20,11 +20,11 @@ var (
 )
 
 type Item struct {
-	Text        string   `json:"text"`
-	Offset      string   `json:"offset"` // file offset of the pointer bytes
-	Xref        string   `json:"xref"`   // virtual address of the string
-	BytesBefore []string `json:"bytes_before"`
-	BytesAfter  []string `json:"bytes_after"`
+	Text        string `json:"text"`
+	Offset      string `json:"offset"` // file offset of the pointer bytes
+	Xref        string `json:"xref"`   // virtual address of the string
+	BytesBefore string `json:"bytes_before"`
+	BytesAfter  string `json:"bytes_after"`
 }
 
 type Output struct {
@@ -294,12 +294,20 @@ func hex64(v uint64) string {
 	return fmt.Sprintf("0x%x", v)
 }
 
-func hexBytes(bs []byte) []string {
-	out := make([]string, len(bs))
+func hexBytes(bs []byte) string {
+	out := make([]byte, len(bs)*2)
 	for i, b := range bs {
-		out[i] = fmt.Sprintf("0x%02x", b)
+		out[i*2] = hexChar(b >> 4)
+		out[i*2+1] = hexChar(b & 0x0F)
 	}
-	return out
+	return string(out)
+}
+
+func hexChar(b byte) byte {
+	if b < 10 {
+		return '0' + b
+	}
+	return 'a' + b - 10
 }
 
 func Run(path string) ([]byte, error) {
