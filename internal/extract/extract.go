@@ -23,6 +23,7 @@ type Item struct {
 	Text        string `json:"text"`
 	Offset      string `json:"offset"` // file offset of the pointer bytes
 	Xref        string `json:"xref"`   // virtual address of the string
+	Section     string `json:"section"`
 	BytesBefore string `json:"bytes_before"`
 	BytesAfter  string `json:"bytes_after"`
 }
@@ -32,9 +33,10 @@ type Output struct {
 }
 
 type candidate struct {
-	Text string
-	Off  int
-	VA   uint64
+	Text    string
+	Off     int
+	VA      uint64
+	Section string
 }
 
 func Extract(data []byte) ([]byte, error) {
@@ -100,7 +102,7 @@ func findStringCandidates(pf *pe.File) []candidate {
 								key := fmt.Sprintf("%d|%s", start+i, text)
 								if _, exists := seen[key]; !exists {
 									seen[key] = struct{}{}
-									res = append(res, candidate{Text: text, Off: start + i, VA: va})
+									res = append(res, candidate{Text: text, Off: start + i, VA: va, Section: sec.Name})
 								}
 							}
 						}
@@ -143,7 +145,7 @@ func findStringCandidates(pf *pe.File) []candidate {
 							key := fmt.Sprintf("%d|%s", start+i, text)
 							if _, exists := seen[key]; !exists {
 								seen[key] = struct{}{}
-								res = append(res, candidate{Text: text, Off: start + i, VA: va})
+								res = append(res, candidate{Text: text, Off: start + i, VA: va, Section: sec.Name})
 							}
 						}
 					}
@@ -262,6 +264,7 @@ func appendIfKnown(items []Item, seen map[string]struct{}, candByVA map[uint64][
 			Text:        c.Text,
 			Offset:      hex64(uint64(absPtr)),
 			Xref:        hex64(target),
+			Section:     c.Section,
 			BytesBefore: hexBytes(pf.Data[absPtr-3 : absPtr]),
 			BytesAfter:  hexBytes(pf.Data[absPtr+ptrSize : absPtr+ptrSize+3]),
 		})
