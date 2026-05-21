@@ -40,12 +40,16 @@ type candidate struct {
 }
 
 func Extract(data []byte) ([]byte, error) {
+	return ExtractWithPattern(data, nil)
+}
+
+func ExtractWithPattern(data []byte, customPattern *regexp.Regexp) ([]byte, error) {
 	pf, err := pe.Parse(data)
 	if err != nil {
 		return nil, err
 	}
 
-	candidates := findStringCandidates(pf)
+	candidates := findStringCandidates(pf, customPattern)
 	if len(candidates) == 0 {
 		out, _ := json.MarshalIndent(Output{Strings: []Item{}}, "", "  ")
 		return out, nil
@@ -66,7 +70,11 @@ func Extract(data []byte) ([]byte, error) {
 	return out, nil
 }
 
-func findStringCandidates(pf *pe.File) []candidate {
+func CompilePattern(pattern string) (*regexp.Regexp, error) {
+	return regexp.Compile(pattern)
+}
+
+func findStringCandidates(pf *pe.File, customPattern *regexp.Regexp) []candidate {
 	seen := map[string]struct{}{}
 	var res []candidate
 
@@ -97,7 +105,7 @@ func findStringCandidates(pf *pe.File) []candidate {
 					bs := raw[i:j]
 					if isLikelyText(bs) {
 						text := string(bs)
-						if isValidText(text) {
+						if isValidText(text, customPattern) {
 							if va, ok := pf.RawToVA(start + i); ok {
 								key := fmt.Sprintf("%d|%s", start+i, text)
 								if _, exists := seen[key]; !exists {
@@ -140,7 +148,7 @@ func findStringCandidates(pf *pe.File) []candidate {
 				}
 				if valid && len(units) >= 3 && j+1 < len(raw) && raw[j] == 0 && raw[j+1] == 0 {
 					text := string(utf16.Decode(units))
-					if isValidText(text) {
+					if isValidText(text, customPattern) {
 						if va, ok := pf.RawToVA(start + i); ok {
 							key := fmt.Sprintf("%d|%s", start+i, text)
 							if _, exists := seen[key]; !exists {
@@ -179,12 +187,15 @@ func isLikelyText(bs []byte) bool {
 	return printable == len(bs)
 }
 
-func isValidText(s string) bool {
+func isValidText(s string, customPattern *regexp.Regexp) bool {
 	if len(s) < 3 {
 		return false
 	}
 	if !utf8.ValidString(s) {
 		return false
+	}
+	if customPattern != nil {
+		return customPattern.MatchString(s)
 	}
 	return stringPattern.MatchString(s)
 }
