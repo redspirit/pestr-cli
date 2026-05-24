@@ -4,8 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	"pestr/internal/extract"
+	"pestr/internal/patch"
 )
 
 func main() {
@@ -22,6 +24,28 @@ func main() {
 		pattern.StringVar(&p, "pattern", "", "alternative regex pattern for filtering strings")
 		pattern.Parse(os.Args[2:])
 		if err := runExtract(pattern.Arg(0), &p); err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
+	case "patch":
+		patchFlags := flag.NewFlagSet("patch", flag.ExitOnError)
+		var jsonPath string
+		var outPath string
+		patchFlags.StringVar(&jsonPath, "json", "", "path to json with translations (if omitted, read from stdin)")
+		patchFlags.StringVar(&outPath, "out", "", "output path for patched exe (required)")
+
+		args := os.Args[2:]
+		exePath := ""
+		if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+			exePath = args[0]
+			args = args[1:]
+		}
+		patchFlags.Parse(args)
+		if exePath == "" {
+			exePath = patchFlags.Arg(0)
+		}
+
+		if err := runPatch(exePath, jsonPath, outPath); err != nil {
 			fmt.Fprintln(os.Stderr, "error:", err)
 			os.Exit(1)
 		}
@@ -62,6 +86,15 @@ func runExtract(path string, pattern *string) error {
 	return err
 }
 
+func runPatch(exePath, jsonPath, outPath string) error {
+	if outPath == "" {
+		return fmt.Errorf("missing required --out parameter")
+	}
+	return patch.Run(exePath, jsonPath, outPath)
+}
+
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: pestr extract <file.exe>")
+	fmt.Fprintln(os.Stderr, "usage:")
+	fmt.Fprintln(os.Stderr, "  pestr extract <file.exe> [-p <pattern>]")
+	fmt.Fprintln(os.Stderr, "  pestr patch <file.exe> --out patched.exe [--json localisation.json]")
 }
